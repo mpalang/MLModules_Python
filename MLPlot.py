@@ -18,21 +18,25 @@ def MLplot(x,
              separate=True,
              title=None,
              label=None,
-             pad=1
+             xlabel=None,
+             ylabel=None,
+             Abs=False,
+             static=False,
+             show=True
              ):
     
     
     #padding in percent of maximum
     
-    padx = pad
-    pady = pad
+    padx = 1
+    pady = 1
 
     # this function wants to deal with lists   
 
     if type(Y)!=list:
         Y=[Y]
         
-    if type(x)!=np.array:
+    if type(x).__module__ != np.__name__:
         x=np.arange(0,Y[0].shape[0],1)
 
     # Make separate figures for each dataset in list:
@@ -76,12 +80,30 @@ def MLplot(x,
             
     else:
         for n,y in enumerate(Y):
-            plt.plot(x,y)
+            fig=plt.plot(x,y)
         
+        if Abs:
+            factor=np.nanmax(Y)/np.nanmax(Abs[1][Abs[1]!=np.inf])
+            fig=plt.plot(Abs[0],Abs[1]*factor,'k',linestyle='dashed',linewidth=0.5)
+            label.append('Absorbance')
+            
+        if static:
+            statAbs=-np.log10(static[1])
+            factor=np.nanmax(Y)/np.nanmax(statAbs[statAbs!=np.inf])
+            fig=plt.plot(static[0],statAbs*factor,'r',linestyle='dotted',linewidth=0.5)
+            label.append('Abs. from TA')
+            
+            
         plt.title(title)
-        plt.legend(label,bbox_to_anchor=(1,1))
+        plt.legend(label)#,bbox_to_anchor=(1,1))
         
-        plt.show()
+        plt.ylabel(ylabel)
+        plt.xlabel(xlabel)
+        
+        if show:
+            plt.show()
+        else:   
+            return fig
     
 
 
@@ -98,10 +120,10 @@ def MLcontour(x,
              title=None
              ):
     
-    if type(x)!=np.array:
+    if type(x).__module__ != np.__name__:
         x=np.arange(0,Z.shape[1],1)
         
-    if type(y)!=np.array:
+    if type(y).__module__ != np.__name__:
         y=np.arange(0,Z.shape[0],1)
     
     
