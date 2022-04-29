@@ -3,28 +3,30 @@
 This is a function to make nice figures with minimum effort.
 """
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.cm import ScalarMappable
 
+from pathlib import Path
+
 #%%
 
-def MLplot(x,
-             Y,
-             xmin=None,
-             xmax=None,
-             ymin=None,
-             ymax=None,
-             separate=True,
-             title=None,
-             label=None,
-             xlabel=None,
-             ylabel=None,
-             Abs=False,
-             static=False,
-             show=True
-             ):
+def MLplot( x,
+            Y,
+            xmin=None,
+            xmax=None,
+            ymin=None,
+            ymax=None,
+            title=None,
+            label=[],
+            xlabel=None,
+            ylabel=None,
+            GUI=False
+            ):
     
+    if GUI:
+        matplotlib.use('TkAgg')
     
     #padding in percent of maximum
     
@@ -40,6 +42,8 @@ def MLplot(x,
         x=np.arange(0,Y[0].shape[0],1)
 
     # Make separate figures for each dataset in list:
+        
+    fig=plt.figure()
     
     plt.tick_params(axis='x', direction='in')
     plt.tick_params(axis='y', direction='in')
@@ -52,60 +56,30 @@ def MLplot(x,
         xmax = np.nanmax(x[x!=np.inf])*(1+padx/100)
     
     plt.xlim([xmin,xmax])
-    
-        
-    if separate:
-    
-        for y in Y:
-            
-            # set y-Range if not specified:
-            
-            if ymin==None:
-                ymin=np.nanmin(y[y!=-np.inf])*(1+pady/100)
-            if ymax==None:
-                ymax=np.nanmax(y[y!=np.inf])*(1+padx/100)
-            
-            plt.ylim([ymin,ymax])
-            
-            # Legend, labels etc.:
-                
-            plt.title(title)
-            plt.legend(bbox_to_anchor=(1,1))
-            
-            #plot:
-                
-            plt.plot(x,y,label=label)
-            
-            plt.show()
-            
-    else:
-        for n,y in enumerate(Y):
-            fig=plt.plot(x,y)
-        
-        if Abs:
-            factor=np.nanmax(Y)/np.nanmax(Abs[1][Abs[1]!=np.inf])
-            fig=plt.plot(Abs[0],Abs[1]*factor,'k',linestyle='dashed',linewidth=0.5)
-            label.append('Absorbance')
-            
-        if static:
-            statAbs=-np.log10(static[1])
-            factor=np.nanmax(Y)/np.nanmax(statAbs[statAbs!=np.inf])
-            fig=plt.plot(static[0],statAbs*factor,'r',linestyle='dotted',linewidth=0.5)
-            label.append('Abs. from TA')
-            
-            
-        plt.title(title)
-        plt.legend(label)#,bbox_to_anchor=(1,1))
-        
-        plt.ylabel(ylabel)
-        plt.xlabel(xlabel)
-        
-        if show:
-            plt.show()
-        else:   
-            return fig
-    
 
+
+    for n,y in enumerate(Y):
+        if type(y)==tuple:
+            plt.plot(y[0],y[1])
+        else:
+            plt.plot(x,y)
+    
+        
+        
+    plt.title(title)
+    
+    if len(label)==0:
+         for n in range(len(Y)):
+             label.append('Curve'+str(n+1))       
+    plt.legend(label)#,bbox_to_anchor=(1,1))
+    
+    plt.ylabel(ylabel)
+    plt.xlabel(xlabel)
+
+    
+    return fig
+    
+        
 
 def MLcontour(x,
              y,
@@ -117,7 +91,9 @@ def MLcontour(x,
              zmin=None,
              zmax=None,
              separate=True,
-             title=None
+             title=None,
+             xlabel=None,
+             ylabel=None
              ):
     
     if type(x).__module__ != np.__name__:
@@ -139,8 +115,14 @@ def MLcontour(x,
     levels = np.linspace(zmin,zmax,levels+1)
     
     img=plt.contourf(x,y,Z,levels=levels,cmap='rainbow')
+    plt.xlim(xmin,xmax)
+    plt.ylim(ymin,ymax)
+    
+    
     plt.colorbar(img)
     plt.title(title)
+    plt.ylabel(ylabel)
+    plt.xlabel(xlabel)
 
     plt.tick_params(axis='x', direction='in')
     plt.tick_params(axis='y', direction='in')
