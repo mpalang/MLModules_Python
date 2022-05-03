@@ -20,6 +20,7 @@ import numpy as np
 from MLModules.MLPlot import MLplot as plot
 from MLModules.MLPlot import MLcontour as contour
 import MLModules.MLBasic_GUI as GUI
+import matplotlib.pyplot as plt
 
 import logging
 logging.basicConfig(
@@ -251,17 +252,17 @@ class treatedData:
 
 #%% Execute Treated Data Functions here:
     
-# filelist = [
-#             # r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/02_ma',
-#             r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/05_ma_rot',
-#             # r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/06_ACN_rot',
-#             r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/07_parallel_rot',
-#             r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/08_perp_rot',
-#             r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/12_short',
-#             r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/13_long',
-#             # r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/14_ACN_long',
-#             # r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/15_ACN_short'
-#             ]
+filelist = [
+            # r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/02_ma',
+            r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/05_ma_rot',
+            # r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/06_ACN_rot',
+            r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/07_parallel_rot',
+            r'C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/08_perp_rot',
+            r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/12_short',
+            r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/13_long',
+            # r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/14_ACN_long',
+            r'C:/Users/work/Messdaten/U21_TA/20220422_Berkefeld/15_ACN_short'
+            ]
 
 # data={}
 # for f in filelist:
@@ -288,24 +289,62 @@ class treatedData:
 #%% Fitted Data:
     
 class fitData :
-    def __init__(self,folderpath=None):
+    """
+    Class to quickly get fitted Data and Plot nice figures.
+    """
+    
+    def __init__(self,folderpath=None,Abspath=None):
         
         if folderpath==None:
             folderpath = GUI.SelectFolder() 
+            
+        if not Path(folderpath).is_dir():
+            logging.error(f'Path "{folderpath}" does not exist.')
+            sys.exit()
+            
         
         self.path=folderpath
+        self.title=Path(folderpath).name
         
-        folderpath = folderpath.replace("\\","/")
-    
-        files = glob(str(folderpath)+'/**/*', recursive=True)
+        self.Abspath=Abspath
+ 
+        self.getInfo()
+               
+        #Initialize
         self.No_Comp=0
         self.tau=[]
         self.DAS = []
         self.path = folderpath
         
-        WLTablepath = glob(str(Path(Path(folderpath).parent,'Calibration/*WaveLengthTable*')),recursive=True)[0]
-        self.WavelengthTable = np.loadtxt(WLTablepath,delimiter='\t')
+
+        self.getParms()
+        self.getData()
         
+
+        
+                
+    ##Functions####################
+    
+    
+    def getInfo(self):
+        
+        try:
+            info=Path(self.path,'info.txt').read_text().split('\n')
+            self.info={}
+            for line in info:
+                if len(line)>1:
+                    c=line.split('=')
+                    self.info[c[0]]=c[1]
+            
+            self.title=f'{self.info["Sample"]}, Pol.: {self.info["Polarization"]}, \u0394t: {self.info["Timerange"]}'
+        except:
+            logging.critical(f'no info found in {Path(self.path,"info.txt")}')
+            
+            
+        
+    def getParms(self):
+        
+        files = glob(str(self.path)+'/**/*', recursive=True)
         for f in files:
             
             if 'parameter' in f:
@@ -321,8 +360,15 @@ class fitData :
                     for line in self.text:
                         if 'tau_'+str(n+1) in line:
                             self.tau.append(float(search('([0-9]+[.])[0-9]+',line).group()))
+    
                             
-                        
+    
+    def getData(self):
+        
+        # WLTablepath = glob(str(Path(Path(self.path).parent,'Calibration/*WaveLengthTable*')),recursive=True)[0]
+        # self.WavelengthTable = np.loadtxt(WLTablepath,delimiter='\t')
+        
+        files = glob(str(self.path)+'/**/*', recursive=True)        
         for f in files:
            
             if 'amplitudes' in f:
@@ -335,7 +381,9 @@ class fitData :
 
             if '.fit' in f:
                 data = np.genfromtxt(Path(f), delimiter='\t',)
-                self.fit = data
+                self.fit = data[1:,1:].T
+                self.fit_WL = data[1:,0]
+                self.fit_dt = data[0,1:]
     
             elif '.dat' in f and 'cc' in f:
                 data = np.genfromtxt(f)
@@ -345,40 +393,145 @@ class fitData :
             
             elif 'static' in f:
                 data = np.genfromtxt(f)
-                self.static = data[1:,:]
+                self.static = -np.log10(data[1:,:])
                 self.static_t = data[0,:]
         
         # Get Path to absorption spectrum:
-                
-        Abspath = glob(str(Path(Path(folderpath).parent,'Absorption','*')))
-                
-        if len(Abspath)>1:
-            for i in Abspath:
-                print(i+'\n')
-                
-        
-                # data = np.genfromtxt(Abspath, delimiter=';')
-                # self.Abs_WL = data[:,0]
-                # self.Abs = data[:,1]
-                
+        if self.Abspath==None:        
+            self.Abspath = glob(str(Path(Path(self.path).parent,'Absorption','*')))
+                    
+            if len(self.Abspath)>1:
+                self.Abspath=GUI.SelectFile(title='Specify Path to absorbance spectrum',
+                                       path=Path(self.path).parent)
+            
+        Abs = np.genfromtxt(self.Abspath,delimiter=';')
+        self.Abs_WL = Abs[:,0]
+        self.Abs = Abs[:,1]
         
 
-    def plot(self,GUI=False):
+            
+
+    def plot(self,
+             DAS=True, ROI=None,
+             Dec_ROI=None, scale_break=None,
+             Abs=True,Abs_ROI=None,
+             save=False,
+             gui=False,
+             dpi=2000):
         
+        if save:
+            Path(self.path,'Figures').mkdir(exist_ok=True)
+        
+        if DAS:
+            # try:
+                fig=plot(self.DAS_WL,self.DAS, 
+                    label=[str(i)+' ps' for i in self.tau], 
+                    title=self.title, 
+                    xlabel='WL/nm', ylabel=r'$\Delta$OD',
+                    GUI=gui,
+                    xrule=True,
+                    dpi=dpi
+                    )
+                if save:
+                    fig.savefig(Path(self.path,'Figures','DAS'),dpi='figure', bbox_inches = "tight")
+                    plt.close()
+                    
+            # except:
+            #     logging.warning(f'no DAS available for {self.title}')
+        
+
+        if Dec_ROI:
+            Y=[]
+            label=[]
+            colors_list=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+            colors=[]
+            linestyles=[]
+            for n,i in enumerate(Dec_ROI):
+                fromx=np.argmax(self.WL>i[0])
+                tox=np.argmax(self.WL>i[1])
+                Y.append(np.mean(self.TA[:,fromx:tox],axis=1))
+                linestyles.append('o')
+                colors.append(colors_list[n])
+                label.append(f'TA from {i[0]}nm to {i[1]}nm')
+                fromx=np.argmax(self.fit_WL>i[0])
+                tox=np.argmax(self.fit_WL>i[1])
+                Y.append(np.mean(self.fit[:,fromx:tox],axis=1))
+                linestyles.append('-')
+                colors.append(colors_list[n])
+                label.append('_nolegend_')
+            
+            if not scale_break:
+                scale_break = round(np.mean(self.tau)/2)
                 
-        plot(self.DAS_WL,self.DAS, 
-             label=[str(i)+' ps' for i in self.tau], title=str(Path(self.path).name), 
-             xlabel='WL/nm', ylabel=r'$\Delta$OD',
-             GUI=GUI
-             )
-       
+            fig=plot(self.dt, Y,
+                 xlabel='dt/ps', ylabel=r'$\Delta$OD',
+                 title=self.title,
+                 colors=colors,
+                 linestyles=linestyles,
+                 label=label,
+                 xscale='symlog',
+                 scale_break=scale_break,
+                 xrule=True,
+                 dpi=dpi)
+            if save:
+                fig.savefig(Path(self.path,'Figures','Decay'),dpi='figure', bbox_inches = "tight")
+                plt.close()
+        
+        
+        if Abs:
+            # try:
+                fig=plot(self.WL,[np.mean(self.static,axis=1),
+                     (self.Abs_WL,self.Abs)],
+                     xrange=ROI,                     
+                     xlabel='WL/nm', ylabel='Abs./OD',
+                     title=self.title,
+                     label=['Abs. from pump probe','Absorbance'],
+                     xrule=True,
+                     dpi=dpi)
+                if save:
+                    fig.savefig(Path(self.path,'Figures','Abs'),dpi='figure', bbox_inches = "tight")
+                    plt.close()
+                    
+                if Abs_ROI:
+                    Y=[]
+                    label=[]
+                    for i in Abs_ROI:
+                        fromx=np.argmax(self.WL>i[0])
+                        tox=np.argmax(self.WL>i[1])
+                        Y.append(np.mean(self.static[fromx:tox,:],axis=0))
+                        label.append(f'Abs. from {i[0]}nm to {i[1]}nm')
+                        
+                    fig=plot(self.static_t/60, Y,
+                             xlabel='t/min', ylabel='OD',
+                             yrange=(0,None),
+                             title=self.title, 
+                             label=label,
+                             xrule=True,
+                             dpi=dpi)
+                    if save:
+                        fig.savefig(Path(self.path,'Figures','Degradation'),dpi='figure', bbox_inches = "tight")
+                        plt.close()
+                else:
+                    pass
+                    
+            # except:
+            #     logging.warning(f'no Absorbancespectra available for {self.title}')
+                
 
     
 #%% Execute Treated Data Functions:
-# if __name__ == '__main__':    
-#     fitdata={}
-#     for f in filelist:
-#         try:
-#             fitdata[str(Path(f).name)]=fitData(str(Path(f)))
-#         except:
-#             print(f'{Path(f).name} not existing.')
+if __name__ == '__main__':    
+    fitdata={}
+    for f in filelist:
+        try:
+            Abspath="C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/Absorption/02_Co_Otf_ACN_1mm_c2.csv"
+            fitdata[str(Path(f).name)]=fitData(str(Path(f)),Abspath)
+
+        except:
+            print(f'{Path(f).name} not existing.')
+            
+    for key in fitdata.keys():
+        ROI=(400,700)
+        Dec_ROI=[(445,455),(550,600)]
+        Abs_ROI=[(400,450)]
+        fitdata[key].plot(ROI=ROI,Dec_ROI=Dec_ROI,Abs_ROI=Abs_ROI,save=True)
