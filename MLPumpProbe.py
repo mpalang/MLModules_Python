@@ -1,3 +1,4 @@
+#%%Import
 # -*- coding: utf-8 -*-
 """
 Created on Mon Apr 11 10:50:26 2022
@@ -20,6 +21,7 @@ import numpy as np
 from MLModules.MLPlot import MLplot as plot
 from MLModules.MLPlot import MLcontour as contour
 import MLModules.MLBasic_GUI as GUI
+import matplotlib
 import matplotlib.pyplot as plt
 
 import logging
@@ -33,17 +35,8 @@ logging.basicConfig(
 
 
 
-#%% Here you can specify some file or folderpaths if needed.
-
-# folderpath = [r"C:\Users\work\Messdaten\U21_TA\20220422_Berkefeld\12_short",
-#               r"C:\Users\work\Messdaten\U21_TA\20220422_Berkefeld\13_long"]
-# filepath = r"C:\Users\work\Messdaten\U21_TA\20220414_Fe-PDSJS20\05_transient_ma.dat"
-# folderpath = Path(folderpath.replace("\\","/"))
-# filepath = Path(filepath.replace("\\","/"))
 
 #%% Raw Data:
-
-
 
 
 def SubtractSolvent(filepath=None):
@@ -74,12 +67,19 @@ class RawData:
         filelist=glob(str(folderpath)+'/**/*', recursive=True)
         
         self.path = folderpath
-        self.t_path = glob(str(Path(folderpath,'raw','*transient*')))[0]
+        self.t_path = glob(str(Path(folderpath,'raw','*transient*')))
         self.s_path = glob(str(Path(folderpath,'raw','*static*')))[0]
         
-        transient = np.loadtxt(Path(self.t_path), delimiter='\t')
-        self.dt = transient[0,:]
-        self.transient = transient[1:,:]
+        for i in self.t_path:
+            if 'fc' in i:
+                transient = np.loadtxt(Path(i), delimiter='\t')
+                self.fc = transient[1:,:]
+                self.fc_path=i
+            else:
+                transient = np.loadtxt(Path(i), delimiter='\t')
+                self.dt = transient[0,:]
+                self.transient = transient[1:,:]
+                self.t_path=i
         
         static = np.loadtxt(Path(self.s_path), delimiter='\t')
         
@@ -113,9 +113,14 @@ class RawData:
                   'strong': 0.1
                   }
         
-        contour(None,None,self.transient,
+        try:
+            transient=self.fc
+        except:
+            transient=self.transient
+        
+        contour(None,self.WL,transient,
                 zmin=1-z_range[signal_strength],zmax=1+z_range[signal_strength],
-                title=f'{Path(self.path).name} transient',xlabel='Datapoint',ylabel='Pixel')
+                title=f'{Path(self.path).name} transient',xlabel='Datapoint',ylabel='Wavelength/nm')
         contour(None,self.WL,self.static,
                 zmin=0,zmax=1,
                 title=f'{Path(self.path).name} static',xlabel='Datapoint',ylabel='Wavelength/nm')    
@@ -127,7 +132,7 @@ class RawData:
         """
         
         try:
-            transient=self.transient_fc
+            transient=self.fc
         except:
             transient=self.transient
         
@@ -141,6 +146,7 @@ class RawData:
                     title=f'{Path(self.path).name} transient',xlabel='Datapoint',ylabel='Pixel')    
             
             found_point = str(input('found flip? (y/n) '))
+            
             
             if found_point=='y':
                 self.flip_position = int(input('position: '))
@@ -175,26 +181,43 @@ class RawData:
         
         np.savetxt(Path(Path(self.t_path).parent,str(Path(self.t_path).stem)+'_fc'+Path(self.t_path).suffix), data, delimiter='\t', fmt='%1.8f')
         
-        self.transient_fc = transient_c
+        self.fc = transient_c
         
-        contour(None,None,self.transient,
+        contour(None,None,self.fc,
                 zmin=1-z_range[self.signal_strength],zmax=1+z_range[self.signal_strength],
                 title=f'{Path(self.path).name} transient flip corrected',xlabel='Datapoint',ylabel='Pixel') 
 
         more_flips = input('more flips? (y/n)  ')
         
         if more_flips=='y':
-            self.plotFlip()
+            self.searchFlip()
+
 
 #%% Execute RawData Functions here:
-    
-# dt_ma, WL, transient_ma,t_ma, static_ma, t_path = getRawData(Path(folderpath,'05_ma'))   
-# transient_c = correctFlip(dt_ma,WL,transient_ma,1144,'before',Path(str(t_path).replace('.dat','')+'_fc.dat')) 
+if __name__=='__main__':
 
-# data={}
-# for path in folderpath:
-#     data[Path(path).name]=RawData(path)
- 
+    folderpath = ['E:/Moritz/Messdaten/U21_TA/20220420_Fe-PD237/00_ma',
+                  'E:/Moritz/Messdaten/U21_TA/20220420_Fe-PD237/02_pa',
+                  'E:/Moritz/Messdaten/U21_TA/20220420_Fe-PD237/03_pe',
+                  'E:/Moritz/Messdaten/U21_TA/20220420_Fe-PDYY18/04_ma',
+                  'E:/Moritz/Messdaten/U21_TA/20220420_Fe-PDYY18/05_pa',
+                  'E:/Moritz/Messdaten/U21_TA/20220420_Fe-PDYY18/06_pe',
+                  ]
+    # filepath = r"C:\Users\work\Messdaten\U21_TA\20220414_Fe-PDSJS20\05_transient_ma.dat"
+    # folderpath = Path(folderpath.replace("\\","/"))
+    # filepath = Path(filepath.replace("\\","/"))
+    
+    f={}
+    for n,i in enumerate(folderpath):
+        f[Path(i).name]=RawData(i)
+        # f[Path(i).name].plot()
+    
+    del(i,n)
+    
+    # data={}
+    # for path in folderpath:
+    #     data[Path(path).name]=RawData(path)
+     
            
 #%% Treated Data:
 
@@ -271,7 +294,6 @@ filelist = [
 #     except:
 #         print(f'{Path(f).name} not existing.')
         
-#%%
 
 # for key in data.keys():
 #     try:
@@ -301,8 +323,7 @@ class fitData :
         if not Path(folderpath).is_dir():
             logging.error(f'Path "{folderpath}" does not exist.')
             sys.exit()
-            
-        
+
         self.path=folderpath
         self.title=Path(folderpath).name
         
@@ -315,17 +336,12 @@ class fitData :
         self.tau=[]
         self.DAS = []
         self.path = folderpath
-        
 
         self.getParms()
         self.getData()
-        
-
-        
-                
+          
     ##Functions####################
-    
-    
+  
     def getInfo(self):
         
         try:
@@ -375,9 +391,11 @@ class fitData :
                 data = np.genfromtxt(Path(f), delimiter='\t',skip_header=4)
                 self.DAS_WL = data[:,0]
                 
+                sorting=np.argsort(self.tau)
+                self.tau.sort()
                 
                 for n in range(self.No_Comp):
-                    self.DAS.append(data[:,n+1])
+                    self.DAS.append(data[:,sorting[n]+1])
 
             if '.fit' in f:
                 data = np.genfromtxt(Path(f), delimiter='\t',)
@@ -412,23 +430,70 @@ class fitData :
             
 
     def plot(self,
-             DAS=True, ROI=None,
-             Dec_ROI=None, scale_break=None,
-             Abs=True,Abs_ROI=None,
+             DAS=True, ROI=None, yrange=(None,None), 
+             Dec_ROI=None, scale_break=None, Dec_yrange=(None,None),
+             Abs=True,Abs_ROI=None,Abs_range=None,
+             Spec_dt=None, dt_ROI=None,
              save=False,
              gui=False,
-             dpi=2000):
+             dpi=200):
+        
+        """
+
+        Parameters
+        ----------
+        DAS : Switch, optional
+            Plot DAS-spectra. The default is True.
+        ROI : Touple, optional
+            (lower, upper) boundary of interesting range. The default is None.
+        yrange : Touple, optional
+            DESCRIPTION. The default is None.
+        dt_ROI : TYPE, optional
+            DESCRIPTION. The default is None.
+        Dec_ROI : List of Touples, optional
+            Specify characteristic ranges for components to plot decay curves. The default is None.
+        scale_break : double, optional
+            Specify position where linear and log scale is switched. The default is None.
+        Dec_yrange : TYPE, optional
+            DESCRIPTION. The default is None.
+        Abs : Switch, optional
+            Show Abs.spectra. The default is True.
+        Abs_ROI : Touple, optional
+            Range where to observe degradation. The default is None.
+        Abs_range : TYPE, optional
+            DESCRIPTION. The default is True.
+        Spec_dt : List, optional
+            Delaytimes to plot. The default is None.
+        save : Switch, optional
+            Save spectra to file? The default is False.
+        gui : Switch, optional
+            GUI is used. The default is False.
+        dpi : int, optional
+            resolution for plots. The default is 200.
+
+        Returns
+        -------
+
+        """
+
+        
         
         if save:
             Path(self.path,'Figures').mkdir(exist_ok=True)
         
         if DAS:
             # try:
+                labels=[]
+                for i in self.tau:
+                    if i>0.0999:
+                        labels.append(str(round(i,1))+' ps')
+                    else:
+                        labels.append(str(round(i,2))+' ps')
                 fig=plot(self.DAS_WL,self.DAS, 
-                    label=[str(i)+' ps' for i in self.tau], 
+                    label=labels, 
                     title=self.title, 
                     xlabel='WL/nm', ylabel=r'$\Delta$OD',
-                    GUI=gui,
+                    gui=gui,
                     xrule=True,
                     dpi=dpi
                     )
@@ -443,7 +508,7 @@ class fitData :
         if Dec_ROI:
             Y=[]
             label=[]
-            colors_list=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+            colors_list=['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf','#d62728' ]
             colors=[]
             linestyles=[]
             for n,i in enumerate(Dec_ROI):
@@ -452,24 +517,31 @@ class fitData :
                 Y.append(np.mean(self.TA[:,fromx:tox],axis=1))
                 linestyles.append('o')
                 colors.append(colors_list[n])
-                label.append(f'TA from {i[0]}nm to {i[1]}nm')
+                label.append('_nolegend_')
+
+                
                 fromx=np.argmax(self.fit_WL>i[0])
                 tox=np.argmax(self.fit_WL>i[1])
                 Y.append(np.mean(self.fit[:,fromx:tox],axis=1))
                 linestyles.append('-')
                 colors.append(colors_list[n])
-                label.append('_nolegend_')
+                label.append(f'TA from {i[0]}nm to {i[1]}nm')
             
             if not scale_break:
                 scale_break = round(np.mean(self.tau)/2)
-                
+            
+            if not Dec_yrange:
+                Dec_yrange=yrange   
+            
             fig=plot(self.dt, Y,
-                 xlabel='dt/ps', ylabel=r'$\Delta$OD',
+                 xlabel=r'$\Delta$t/ps', ylabel=r'$\Delta$OD',
                  title=self.title,
                  colors=colors,
                  linestyles=linestyles,
                  label=label,
                  xscale='symlog',
+                 xrange=(dt_ROI),
+                 yrange=Dec_yrange,
                  scale_break=scale_break,
                  xrule=True,
                  dpi=dpi)
@@ -480,9 +552,11 @@ class fitData :
         
         if Abs:
             # try:
+                if not Abs_range:
+                    Abs_range=ROI
                 fig=plot(self.WL,[np.mean(self.static,axis=1),
                      (self.Abs_WL,self.Abs)],
-                     xrange=ROI,                     
+                     xrange=Abs_range,                     
                      xlabel='WL/nm', ylabel='Abs./OD',
                      title=self.title,
                      label=['Abs. from pump probe','Absorbance'],
@@ -504,6 +578,7 @@ class fitData :
                     fig=plot(self.static_t/60, Y,
                              xlabel='t/min', ylabel='OD',
                              yrange=(0,None),
+                             pady=0.5,
                              title=self.title, 
                              label=label,
                              xrule=True,
@@ -513,6 +588,28 @@ class fitData :
                         plt.close()
                 else:
                     pass
+            
+        if Spec_dt:
+            Y=[]
+            cmap=plt.cm.get_cmap('gnuplot')(np.linspace(0,1,len(Spec_dt)))
+            cmap=[matplotlib.colors.to_hex(i) for i in cmap]
+            for i in Spec_dt:
+                Y.append(self.TA[np.argmax(self.dt>i),:])
+            
+
+            fig=plot(self.WL,Y,
+                  xrange=ROI, 
+                  yrange=yrange,
+                  colors=cmap,
+                  xlabel='WL/nm', ylabel=r'$\Delta$OD',
+                  title=self.title,
+                  label=[str(i)+' ps' for i in Spec_dt],
+                  xrule=True,
+                  dpi=dpi)
+            if save:
+                fig.savefig(Path(self.path,'Figures','Spectra'),dpi='figure', bbox_inches = "tight")
+                plt.close()
+            
                     
             # except:
             #     logging.warning(f'no Absorbancespectra available for {self.title}')
@@ -520,18 +617,18 @@ class fitData :
 
     
 #%% Execute Treated Data Functions:
-if __name__ == '__main__':    
-    fitdata={}
-    for f in filelist:
-        try:
-            Abspath="C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/Absorption/02_Co_Otf_ACN_1mm_c2.csv"
-            fitdata[str(Path(f).name)]=fitData(str(Path(f)),Abspath)
+# if __name__ == '__main__':    
+#     fitdata={}
+#     for f in filelist:
+#         try:
+#             Abspath="C:/Users/work/Messdaten/U21_TA/20220421_Berkefeld/Absorption/02_Co_Otf_ACN_1mm_c2.csv"
+#             fitdata[str(Path(f).name)]=fitData(str(Path(f)),Abspath)
 
-        except:
-            print(f'{Path(f).name} not existing.')
+#         except:
+#             print(f'{Path(f).name} not existing.')
             
-    for key in fitdata.keys():
-        ROI=(400,700)
-        Dec_ROI=[(445,455),(550,600)]
-        Abs_ROI=[(400,450)]
-        fitdata[key].plot(ROI=ROI,Dec_ROI=Dec_ROI,Abs_ROI=Abs_ROI,save=True)
+#     for key in fitdata.keys():
+#         ROI=(400,700)
+#         Dec_ROI=[(445,455),(550,600)]
+#         Abs_ROI=[(400,450)]
+#         fitdata[key].plot(ROI=ROI,Dec_ROI=Dec_ROI,Abs_ROI=Abs_ROI,save=True)
